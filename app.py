@@ -1,16 +1,17 @@
 import os
 import io
 import xml.etree.ElementTree as ET
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, send_file
 from datetime import datetime
 
+# Register namespaces
 ET.register_namespace('', "x-schema:CufSchema.xml")
 ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# 📁 Map met XML-bestanden (bij deployment in GitHub)
-XML_FOLDER = os.path.join(os.getcwd(), 'olaf_en_piet')
+# 📌 Specifiek bestand dat altijd bewerkt wordt
+XML_FILE_PATH = os.path.join(os.getcwd(), 'olaf_en_piet', 'CUFXML_20250513_155824.xml')
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -22,7 +23,7 @@ def home():
             return "Lengte en breedte zijn verplicht.", 400
 
         try:
-            download_filename, xml_bytes = generate_cufxml(lengte, breedte)
+            download_filename, xml_bytes = bewerk_cufxml(lengte, breedte)
             return send_file(
                 io.BytesIO(xml_bytes),
                 mimetype='application/xml',
@@ -47,36 +48,32 @@ def home():
     </html>
     '''
 
-def generate_cufxml(lengte, breedte):
-    # Zoek nieuwste bestand in de map
-    files = [f for f in os.listdir(XML_FOLDER) if f.endswith('.xml')]
-    if not files:
-        raise FileNotFoundError("Geen CUFXML-bestanden gevonden.")
+def bewerk_cufxml(lengte, breedte):
+    if not os.path.exists(XML_FILE_PATH):
+        raise FileNotFoundError("CUFXML-bestand niet gevonden.")
 
-    latest_file = max(
-        [os.path.join(XML_FOLDER, f) for f in files],
-        key=os.path.getctime
-    )
-
-    tree = ET.parse(latest_file)
+    tree = ET.parse(XML_FILE_PATH)
     root = tree.getroot()
 
     ns = {'cuf': 'x-schema:CufSchema.xml'}
 
     for regel in root.findall('.//cuf:BEGROTINGSREGEL', ns):
         if regel.get('OMSCHRIJVING') == "Vuren Geschaafd 70*170 mm":
-            lengte_f = float(lengte)
-            breedte_f = float(breedte)
-            totaal = lengte_f * breedte_f
-            regel.set('HOEVEELHEID', f"{totaal:.5f}")
-            regel.set('HOEVEELHEID_EENHEID', 'm1')
+            try:
+                lengte_f = float(lengte)
+                breedte_f = float(breedte)
+                totaal = lengte_f * breedte_f
+                regel.set('HOEVEELHEID', f"{totaal:.5f}")
+                regel.set('HOEVEELHEID_EENHEID', 'm1')
+            except ValueError:
+                raise ValueError("Lengte en breedte moeten numeriek zijn.")
             break
 
-    # Bestandnaam
+    # Downloadnaam dynamisch
     filename = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
 
-    # In-memory opslag (geen disk)
-    xml_bytes_io = io.BytesIO()
-    tree.write(xml_bytes_io, encoding='utf-8', xml_declaration=True)
-    return filename, xml_bytes_io.getvalue()
+    # Opslaan in-memory (geen disk!)
+    xml_io = io.BytesIO()
+    tree.write(xml_io, encoding='utf-8', xml_declaration=True)
+    return filename, xml_io.getvalue()
 
