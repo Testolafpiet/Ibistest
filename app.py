@@ -1,16 +1,15 @@
 import os
 import io
 import xml.etree.ElementTree as ET
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, render_template
 from datetime import datetime
 
-# Register namespaces
 ET.register_namespace('', "x-schema:CufSchema.xml")
 ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# 📌 Specifiek bestand dat altijd bewerkt wordt
+# Gebruik steeds dit bestand als basis
 XML_FILE_PATH = os.path.join(os.getcwd(), 'olaf_en_piet', 'CUFXML_20250513_155824.xml')
 
 @app.route('/', methods=['GET', 'POST'])
@@ -33,20 +32,7 @@ def home():
         except Exception as e:
             return f"Fout bij genereren van CUFXML: {e}", 500
 
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head><title>CUFXML Bewerken</title></head>
-    <body>
-        <h1>Voer lengte en breedte in</h1>
-        <form method="POST">
-            Lengte: <input name="lengte" required><br><br>
-            Breedte: <input name="breedte" required><br><br>
-            <button type="submit">Download CUFXML</button>
-        </form>
-    </body>
-    </html>
-    '''
+    return render_template("index.html")
 
 def bewerk_cufxml(lengte, breedte):
     if not os.path.exists(XML_FILE_PATH):
@@ -66,14 +52,10 @@ def bewerk_cufxml(lengte, breedte):
                 regel.set('HOEVEELHEID', f"{totaal:.5f}")
                 regel.set('HOEVEELHEID_EENHEID', 'm1')
             except ValueError:
-                raise ValueError("Lengte en breedte moeten numeriek zijn.")
+                raise ValueError("Lengte en breedte moeten getallen zijn.")
             break
 
-    # Downloadnaam dynamisch
     filename = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-
-    # Opslaan in-memory (geen disk!)
     xml_io = io.BytesIO()
     tree.write(xml_io, encoding='utf-8', xml_declaration=True)
     return filename, xml_io.getvalue()
-
