@@ -1,16 +1,28 @@
 import os
 import io
 import xml.etree.ElementTree as ET
-from flask import Flask, request, send_file, render_template
+from flask import Flask, request, render_template
 from datetime import datetime
+import pyodbc
 
 ET.register_namespace('', "x-schema:CufSchema.xml")
 ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# Gebruik het CUFXML-bestand dat je meestuurt als basis
 XML_BASISPAD = os.path.join(os.getcwd(), 'olaf_en_piet', 'CUFXML_20250513_155824.xml')
+
+# 🔧 Jouw databaseverbinding (PAS AAN met jouw gegevens)
+conn_str = (
+    "Driver={ODBC Driver 17 for SQL Server};"
+    "Server=tcp:JOUWSERVER.database.windows.net,1433;"
+    "Database=JOUW_DATABASE;"
+    "Uid=JOUWGEBRUIKER;"
+    "Pwd=JOUWWACHTWOORD;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=no;"
+    "Connection Timeout=30;"
+)
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -21,19 +33,15 @@ def home():
             return "Oppervlakte (m²) is verplicht.", 400
 
         try:
-            download_naam, bestand_in_geheugen = bewerk_cufxml(m2)
-            return send_file(
-                io.BytesIO(bestand_in_geheugen),
-                mimetype='application/xml',
-                as_attachment=True,
-                download_name=download_naam
-            )
+            bestand_naam, xml_tekst = genereer_cufxml(m2)
+            sla_op_in_sql(bestand_naam, xml_tekst)
+            return f"✅ CUFXML-bestand <strong>{bestand_naam}</strong> is opgeslagen in de database."
         except Exception as e:
-            return f"Fout bij genereren van CUFXML: {e}", 500
+            return f"❌ Fout bij genereren of opslaan: {e}", 500
 
     return render_template("index.html")
 
-def bewerk_cufxml(m2):
+def genereer_cufxml(m2):
     if not os.path.exists(XML_BASISPAD):
         raise FileNotFoundError("CUFXML-basisbestand niet gevonden.")
 
@@ -43,16 +51,21 @@ def bewerk_cufxml(m2):
 
     for regel in root.findall('.//cuf:BEGROTINGSREGEL', ns):
         if regel.get('OMSCHRIJVING') == "Vuren Geschaafd 70*170 mm":
-            try:
-                m2_float = float(m2)
-                regel.set('HOEVEELHEID', f"{m2_float:.5f}")
-                regel.set('HOEVEELHEID_EENHEID', 'm1')
-            except ValueError:
-                raise ValueError("m² moet een geldig getal zijn.")
+            regel.set('HOEVEELHEID', f"{float(m2):.5f}")
+            regel.set('HOEVEELHEID_EENHEID', 'm1')
             break
 
     bestandsnaam = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-    xml_stream = io.BytesIO()
-    tree.write(xml_stream, encoding='utf-8', xml_declaration=True)
-    return bestandsnaam, xml_stream.getvalue()
+    xml_io = io.BytesIO()
+    tree.write(xml_io, encoding='utf-8', xml_declaration=True)
+    return bestandsnaam, xml_io.getvalue().decode('utf-8')
+
+def sla_op_in_sql(bestandsnaam, xml_string):
+    with pyodbc.connect(conn_str) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO CUFXML_Bestanden (naam, inhoud) 
+            VALUES (?, ?)
+        """, bestandsnaam, xml_string)
+        conn.commit()
 
