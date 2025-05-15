@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ruimte Calculator | Bouwbedrijf Leiden</title>
+  <style>
+    :root {
+      --primary-color: #1E3A5F;
+      --accent-color: #F39000;
+      --background-color: #F5F5F5;
+      --text-color: #333;
+      --input-bg: #fff;
+      --input-border: #ccc;
+      --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 1rem 2rem;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    main {
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: var(--primary-color);
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--input-border);
+      border-radius: 4px;
+      background-color: var(--input-bg);
+      font-size: 1rem;
+    }
+
+    button {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #d97900;
+    }
+
+    .result {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      background-color: var(--primary-color);
+      color: white;
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 600px) {
+      main {
+        margin: 1rem;
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bouwbedrijf Leiden</h1>
+  </header>
+  <main>
+    <h2>Bereken de oppervlakte van uw ruimte</h2>
+    <form id="calculatorForm">
+      <label for="length">Lengte (in meters):</label>
+      <input type="number" id="length" name="length" min="0" step="0.01" required />
+
+      <label for="width">Breedte (in meters):</label>
+      <input type="number" id="width" name="width" min="0" step="0.01" required />
+
+      <button type="submit">Bereken Oppervlakte</button>
+    </form>
+    <div class="result" id="result"></div>
+  </main>
+  <footer>
+    &copy; 2025 Bouwbedrijf Leiden. Alle rechten voorbehouden.
+  </footer>
+
+  <script>
+    document.getElementById('calculatorForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const length = parseFloat(document.getElementById('length').value);
+      const width = parseFloat(document.getElementById('width').value);
+      const resultDiv = document.getElementById('result');
+
+      if (isNaN(length) || isNaN(width) || length <= 0 || width <= 0) {
+        resultDiv.textContent = 'Voer alstublieft geldige positieve getallen in voor zowel lengte als breedte.';
+        return;
+      }
+
+      const area = length * width;
+      resultDiv.textContent = `De oppervlakte van de ruimte is ${area.toFixed(2)} m².`;
+    });
+  </script>
+</body>
+</html>
