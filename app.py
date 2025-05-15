@@ -13,8 +13,7 @@ ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# Constants
-INPUT_FILE = 'CUF_bewerkt_20250507_135254.xml'
+# Map waarin CUFXML-bestanden staan
 WATCH_FOLDER = r'C:\Users\Pim Mooten\Bouwbedrijf Leiden\Alle projecten - General\Olaf en Piet'
 IBIS_EXECUTABLE = r'C:\Program Files\Ibis\Ibis Calculeren voor Bouw\IbisCalculeren.exe'
 
@@ -66,7 +65,7 @@ def home():
 
         try:
             file_path = update_cufxml(lengte, breedte)
-            return f"CUFXML-bestand aangemaakt en opgeslagen in de map: {file_path}"
+            return f"CUFXML-bestand aangemaakt en opgeslagen in de map:<br><br>{file_path}"
         except Exception as e:
             return f"Fout bij aanmaken van CUFXML: {e}", 500
 
@@ -86,11 +85,18 @@ def home():
     '''
 
 def update_cufxml(lengte, breedte):
-    if not os.path.exists(INPUT_FILE):
-        raise FileNotFoundError(f"CUFXML-bronbestand niet gevonden: {INPUT_FILE}")
+    # Zoek het meest recente XML-bestand in de map
+    files = [f for f in os.listdir(WATCH_FOLDER) if f.endswith('.xml')]
+    if not files:
+        raise FileNotFoundError("Geen XML-bestanden gevonden in de map.")
 
-    print(f"[INFO] Verwerk CUFXML met lengte={lengte}, breedte={breedte}")
-    tree = ET.parse(INPUT_FILE)
+    latest_file = max(
+        [os.path.join(WATCH_FOLDER, f) for f in files],
+        key=os.path.getctime
+    )
+
+    print(f"[INFO] Verwerk nieuwste CUFXML: {latest_file}")
+    tree = ET.parse(latest_file)
     root = tree.getroot()
 
     ns = {'cuf': 'x-schema:CufSchema.xml'}
@@ -117,3 +123,4 @@ def update_cufxml(lengte, breedte):
 if __name__ == '__main__':
     Thread(target=monitor_folder).start()
     app.run(debug=True, host='127.0.0.1', port=3030)
+
