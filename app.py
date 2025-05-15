@@ -1,17 +1,16 @@
 import os
-import time
-from flask import Flask, request
+import io
 import xml.etree.ElementTree as ET
+from flask import Flask, request, send_file, render_template_string
 from datetime import datetime
 
-# Register namespaces voor CUFXML
 ET.register_namespace('', "x-schema:CufSchema.xml")
 ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# 📂 Map in het project (Azure-compatibel)
-WATCH_FOLDER = os.path.join(os.getcwd(), 'olaf_en_piet')
+# 📁 Map met XML-bestanden (bij deployment in GitHub)
+XML_FOLDER = os.path.join(os.getcwd(), 'olaf_en_piet')
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -23,10 +22,15 @@ def home():
             return "Lengte en breedte zijn verplicht.", 400
 
         try:
-            file_path = update_cufxml(lengte, breedte)
-            return f"CUFXML-bestand aangepast en opgeslagen als:<br><br>{file_path}"
+            download_filename, xml_bytes = generate_cufxml(lengte, breedte)
+            return send_file(
+                io.BytesIO(xml_bytes),
+                mimetype='application/xml',
+                as_attachment=True,
+                download_name=download_filename
+            )
         except Exception as e:
-            return f"Fout bij aanmaken van CUFXML: {e}", 500
+            return f"Fout bij genereren van CUFXML: {e}", 500
 
     return '''
     <!DOCTYPE html>
@@ -37,24 +41,23 @@ def home():
         <form method="POST">
             Lengte: <input name="lengte" required><br><br>
             Breedte: <input name="breedte" required><br><br>
-            <button type="submit">Verwerk CUFXML</button>
+            <button type="submit">Download CUFXML</button>
         </form>
     </body>
     </html>
     '''
 
-def update_cufxml(lengte, breedte):
-    # Zoek nieuwste XML-bestand in map
-    files = [f for f in os.listdir(WATCH_FOLDER) if f.endswith('.xml')]
+def generate_cufxml(lengte, breedte):
+    # Zoek nieuwste bestand in de map
+    files = [f for f in os.listdir(XML_FOLDER) if f.endswith('.xml')]
     if not files:
-        raise FileNotFoundError("Geen XML-bestanden gevonden in de map.")
+        raise FileNotFoundError("Geen CUFXML-bestanden gevonden.")
 
     latest_file = max(
-        [os.path.join(WATCH_FOLDER, f) for f in files],
+        [os.path.join(XML_FOLDER, f) for f in files],
         key=os.path.getctime
     )
 
-    print(f"[INFO] Bewerkt bestand: {latest_file}")
     tree = ET.parse(latest_file)
     root = tree.getroot()
 
@@ -62,17 +65,18 @@ def update_cufxml(lengte, breedte):
 
     for regel in root.findall('.//cuf:BEGROTINGSREGEL', ns):
         if regel.get('OMSCHRIJVING') == "Vuren Geschaafd 70*170 mm":
-            try:
-                lengte_f = float(lengte)
-                breedte_f = float(breedte)
-                totaal = lengte_f * breedte_f
-                regel.set('HOEVEELHEID', f"{totaal:.5f}")
-                regel.set('HOEVEELHEID_EENHEID', 'm1')
-            except ValueError:
-                raise ValueError("Lengte en breedte moeten getallen zijn.")
+            lengte_f = float(lengte)
+            breedte_f = float(breedte)
+            totaal = lengte_f * breedte_f
+            regel.set('HOEVEELHEID', f"{totaal:.5f}")
+            regel.set('HOEVEELHEID_EENHEID', 'm1')
             break
 
-    output_filename = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-    output_path = os.path.join(WATCH_FOLDER, output_filename)
-    tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    return output_filename
+    # Bestandnaam
+    filename = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
+
+    # In-memory opslag (geen disk)
+    xml_bytes_io = io.BytesIO()
+    tree.write(xml_bytes_io, encoding='utf-8', xml_declaration=True)
+    return filename, xml_bytes_io.getvalue()
+
