@@ -1,58 +1,17 @@
 import os
-import subprocess
 import time
-from flask import Flask, render_template, request
+from flask import Flask, request
 import xml.etree.ElementTree as ET
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-from threading import Thread
 from datetime import datetime
 
+# Register namespaces voor CUFXML
 ET.register_namespace('', "x-schema:CufSchema.xml")
 ET.register_namespace('Ibis', "http://www.brinkgroep.nl/ibis/xml")
 
 app = Flask(__name__)
 
-# Map waarin CUFXML-bestanden staan
-WATCH_FOLDER = r'C:\Users\Pim Mooten\Bouwbedrijf Leiden\Alle projecten - General\Olaf en Piet'
-IBIS_EXECUTABLE = r'C:\Program Files\Ibis\Ibis Calculeren voor Bouw\IbisCalculeren.exe'
-
-def start_ibis(file_path):
-    if not os.path.exists(IBIS_EXECUTABLE):
-        print(f"[FOUT] Ibis niet gevonden: {IBIS_EXECUTABLE}")
-        return
-    if not os.path.exists(file_path):
-        print(f"[FOUT] CUFXML-bestand niet gevonden: {file_path}")
-        return
-    try:
-        print(f"[INFO] Start IBIS...")
-        subprocess.Popen([IBIS_EXECUTABLE])
-        time.sleep(5)
-        print(f"[INFO] Open bestand in IBIS: {file_path}")
-        time.sleep(1)
-        subprocess.Popen(f'"{IBIS_EXECUTABLE}" "{file_path}"')
-    except Exception as e:
-        print(f"[FOUT] Starten van IBIS mislukt: {e}")
-
-class CUFXMLWatcher(FileSystemEventHandler):
-    def on_created(self, event):
-        if event.is_directory or not event.src_path.endswith('.xml'):
-            return
-        print(f"[DETECT] Nieuw bestand: {event.src_path}")
-        start_ibis(event.src_path)
-
-def monitor_folder():
-    observer = Observer()
-    handler = CUFXMLWatcher()
-    observer.schedule(handler, path=WATCH_FOLDER, recursive=False)
-    observer.start()
-    print("[WATCHING] Mapmonitor gestart...")
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+# 📂 Map in het project (Azure-compatibel)
+WATCH_FOLDER = os.path.join(os.getcwd(), 'olaf_en_piet')
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -65,7 +24,7 @@ def home():
 
         try:
             file_path = update_cufxml(lengte, breedte)
-            return f"CUFXML-bestand aangemaakt en opgeslagen in de map:<br><br>{file_path}"
+            return f"CUFXML-bestand aangepast en opgeslagen als:<br><br>{file_path}"
         except Exception as e:
             return f"Fout bij aanmaken van CUFXML: {e}", 500
 
@@ -85,7 +44,7 @@ def home():
     '''
 
 def update_cufxml(lengte, breedte):
-    # Zoek het meest recente XML-bestand in de map
+    # Zoek nieuwste XML-bestand in map
     files = [f for f in os.listdir(WATCH_FOLDER) if f.endswith('.xml')]
     if not files:
         raise FileNotFoundError("Geen XML-bestanden gevonden in de map.")
@@ -95,7 +54,7 @@ def update_cufxml(lengte, breedte):
         key=os.path.getctime
     )
 
-    print(f"[INFO] Verwerk nieuwste CUFXML: {latest_file}")
+    print(f"[INFO] Bewerkt bestand: {latest_file}")
     tree = ET.parse(latest_file)
     root = tree.getroot()
 
@@ -109,7 +68,6 @@ def update_cufxml(lengte, breedte):
                 totaal = lengte_f * breedte_f
                 regel.set('HOEVEELHEID', f"{totaal:.5f}")
                 regel.set('HOEVEELHEID_EENHEID', 'm1')
-                print(f"[UPDATE] HOEVEELHEID aangepast naar {totaal:.5f}")
             except ValueError:
                 raise ValueError("Lengte en breedte moeten getallen zijn.")
             break
@@ -117,10 +75,4 @@ def update_cufxml(lengte, breedte):
     output_filename = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
     output_path = os.path.join(WATCH_FOLDER, output_filename)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    print(f"[UPDATED] CUFXML opgeslagen als: {output_path}")
-    return output_path
-
-if __name__ == '__main__':
-    Thread(target=monitor_folder).start()
-    app.run(debug=True, host='127.0.0.1', port=3030)
-
+    return output_filename
