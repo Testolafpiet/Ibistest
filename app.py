@@ -12,13 +12,13 @@ app = Flask(__name__)
 
 XML_BASISPAD = os.path.join(os.getcwd(), 'olaf_en_piet', 'CUFXML_20250513_155824.xml')
 
-# 🔧 Jouw databaseverbinding (PAS AAN met jouw gegevens)
+# ✅ Verbinding met jouw Azure SQL Database
 conn_str = (
     "Driver={ODBC Driver 17 for SQL Server};"
-    "Server=tcp:JOUWSERVER.database.windows.net,1433;"
-    "Database=JOUW_DATABASE;"
-    "Uid=JOUWGEBRUIKER;"
-    "Pwd=JOUWWACHTWOORD;"
+    "Server=tcp:testbbl.database.windows.net,1433;"
+    "Database=test-database;"
+    "Uid=testbbl-admin;"
+    "Pwd=BBL2025!;"
     "Encrypt=yes;"
     "TrustServerCertificate=no;"
     "Connection Timeout=30;"
@@ -33,9 +33,9 @@ def home():
             return "Oppervlakte (m²) is verplicht.", 400
 
         try:
-            bestand_naam, xml_tekst = genereer_cufxml(m2)
-            sla_op_in_sql(bestand_naam, xml_tekst)
-            return f"✅ CUFXML-bestand <strong>{bestand_naam}</strong> is opgeslagen in de database."
+            bestandsnaam, xml_string = genereer_cufxml(m2)
+            sla_op_in_sql(bestandsnaam, xml_string)
+            return f"✅ CUFXML-bestand <strong>{bestandsnaam}</strong> is opgeslagen in de database."
         except Exception as e:
             return f"❌ Fout bij genereren of opslaan: {e}", 500
 
@@ -68,4 +68,3 @@ def sla_op_in_sql(bestandsnaam, xml_string):
             VALUES (?, ?)
         """, bestandsnaam, xml_string)
         conn.commit()
-
