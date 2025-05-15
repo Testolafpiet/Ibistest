@@ -56,9 +56,10 @@ def genereer_cufxml(m2):
             break
 
     bestandsnaam = f"CUFXML_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
-    xml_io = io.BytesIO()
-    tree.write(xml_io, encoding='utf-8', xml_declaration=True)
-    return bestandsnaam, xml_io.getvalue().decode('utf-8')
+
+    # Schrijf XML zonder encoding-header (SQL-veilig)
+    xml_string = ET.tostring(root, encoding='unicode', method='xml')
+    return bestandsnaam, xml_string
 
 def sla_op_in_sql(bestandsnaam, xml_string):
     with pyodbc.connect(conn_str) as conn:
