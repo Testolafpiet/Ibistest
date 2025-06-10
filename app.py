@@ -1,4 +1,4 @@
-import os
+mport os
 import io
 import xml.etree.ElementTree as ET
 from flask import Flask, request, render_template
@@ -28,14 +28,17 @@ conn_str = (
 def home():
     if request.method == 'POST':
         m2 = request.form.get('m2')
+        email = request.form.get('email')
 
         if not m2:
             return "Oppervlakte (m²) is verplicht.", 400
+        if not email:
+            return "E-mailadres is verplicht.", 400
 
         try:
             bestandsnaam, xml_string = genereer_cufxml(m2)
-            sla_op_in_sql(bestandsnaam, xml_string)
-            return f"✅ CUFXML-bestand <strong>{bestandsnaam}</strong> is opgeslagen in de database."
+            sla_op_in_sql(bestandsnaam, xml_string, email)
+            return f"✅ CUFXML-bestand <strong>{bestandsnaam}</strong> is opgeslagen in de database voor <strong>{email}</strong>."
         except Exception as e:
             return f"❌ Fout bij genereren of opslaan: {e}", 500
 
@@ -61,11 +64,11 @@ def genereer_cufxml(m2):
     xml_string = ET.tostring(root, encoding='unicode', method='xml')
     return bestandsnaam, xml_string
 
-def sla_op_in_sql(bestandsnaam, xml_string):
+def sla_op_in_sql(bestandsnaam, xml_string, email):
     with pyodbc.connect(conn_str) as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO CUFXML_Bestanden (naam, inhoud) 
-            VALUES (?, ?)
-        """, bestandsnaam, xml_string)
+            INSERT INTO CUFXML_Bestanden (naam, inhoud, email) 
+            VALUES (?, ?, ?)
+        """, bestandsnaam, xml_string, email)
         conn.commit()
